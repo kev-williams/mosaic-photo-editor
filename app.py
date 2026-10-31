@@ -72,7 +72,7 @@ pages = [
 nav = st.navigation(pages, position="top")
 
 with st.sidebar:
-    settings_panel()
+    settings_panel(nav.url_path)
     st.caption(f"{APP_NAME} {__version__}")
 
 nav.run()

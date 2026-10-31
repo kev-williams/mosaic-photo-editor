@@ -4,6 +4,7 @@
   is kept), arrow keys nudge it (Shift = bigger steps). Only the final position is sent to Python
   when you let go, so dragging is smooth and never fights with the app.
 - danger_button: hold-to-confirm button for actions that delete things.
+- thumb_tiles: a grid of thumbnails; click a picture to open it in the editor.
 """
 from __future__ import annotations
 
@@ -286,3 +287,113 @@ def danger_button(key: str, label: str, on_confirm, help: str = "", done: str = 
         key=key, width="stretch", on_confirmed_change=on_confirm,
         data={"label": label, "holding": "Keep holding...", "done": done, "help": help,
               "disabled": disabled, "hold_ms": hold_ms})
+
+
+# --------------------------------------------------------------------------- clickable thumbnails
+GRID_HTML = '<div class="mpe-grid" role="list"></div>'
+
+GRID_CSS = """
+.mpe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--mpe-min, 140px), 1fr));
+  gap: 18px 14px; }
+.mpe-tile { position: relative; display: flex; flex-direction: column; justify-content: flex-start; align-self: start;
+  width: 100%; padding: 0; margin: 0; border: 0; background: none;
+  text-align: left; font: inherit; color: var(--st-text-color); cursor: pointer; }
+.mpe-tile.static { cursor: default; }
+.mpe-tile:focus-visible { outline: none; }
+.mpe-pic { position: relative; aspect-ratio: var(--mpe-aspect, 2 / 3); border-radius: 8px; overflow: hidden;
+  background: #FFF1E9; box-shadow: 0 0 0 1px #E3C3B4; transition: box-shadow .15s ease, transform .15s ease; }
+.mpe-pic img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.mpe-tile:not(.static):hover .mpe-pic, .mpe-tile:focus-visible .mpe-pic {
+  box-shadow: 0 0 0 2px var(--st-primary-color); transform: translateY(-2px); }
+.mpe-tile.sel .mpe-pic { box-shadow: 0 0 0 3px var(--st-primary-color); }
+.mpe-over { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 8px 7px; color: #fff;
+  font: 600 .72rem/1.2 var(--st-font); background: linear-gradient(rgba(43,20,14,0), rgba(43,20,14,.7));
+  opacity: 0; transition: opacity .15s ease; pointer-events: none; }
+.mpe-tile:not(.static):hover .mpe-over, .mpe-tile:focus-visible .mpe-over { opacity: 1; }
+.mpe-chip { position: absolute; top: 6px; right: 6px; padding: 4px 7px; border-radius: 999px;
+  font: 700 .66rem/1 var(--st-font); letter-spacing: .02em; color: #fff; background: #B45309;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.mpe-chip.man { background: var(--st-primary-color); }
+.mpe-seen { position: absolute; top: 6px; left: 6px; width: 1.25rem; height: 1.25rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; background: #D97706; color: #fff;
+  font: 800 .78rem/1 var(--st-font); box-shadow: 0 0 0 3px rgba(217,119,6,.25); cursor: help; }
+.mpe-t { margin-top: .45rem; font: 600 .78rem/1.3 var(--st-font); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; }
+.mpe-l { font: .74rem/1.35 var(--st-font); color: #6B5650; }
+.mpe-l.warn { color: #9A3412; font-weight: 600; }
+.mpe-l.man { color: var(--st-primary-color); font-weight: 600; }
+"""
+
+GRID_JS = """
+export default function ({ parentElement, data, setTriggerValue }) {
+  const grid = parentElement.querySelector('.mpe-grid');
+  grid.style.setProperty('--mpe-min', (data.min || 140) + 'px');
+  grid.style.setProperty('--mpe-aspect', data.aspect || '2 / 3');
+  const sig = JSON.stringify([data.items.map(i => [i.id, i.src.length, i.label, i.warn, i.manual, i.seen, i.selected]),
+                              data.clickable, data.hint]);
+  if (grid.__sig !== sig) {
+    grid.__sig = sig;
+    grid.replaceChildren();
+    for (const it of data.items) {
+      const tile = document.createElement(data.clickable ? 'button' : 'div');
+      tile.className = 'mpe-tile' + (data.clickable ? '' : ' static') + (it.selected ? ' sel' : '');
+      tile.setAttribute('role', 'listitem');
+      if (data.clickable) { tile.type = 'button'; tile.dataset.id = it.id; tile.title = (data.hint || '') + ': ' + it.title; }
+      const pic = document.createElement('div'); pic.className = 'mpe-pic';
+      const img = document.createElement('img'); img.src = it.src; img.alt = it.title; img.loading = 'lazy';
+      pic.appendChild(img);
+      if (it.seen) { const s = document.createElement('span'); s.className = 'mpe-seen'; s.textContent = '!';
+        s.title = it.seen; pic.appendChild(s); }
+      if (it.warn) { const c = document.createElement('span'); c.className = 'mpe-chip'; c.textContent = 'Check';
+        pic.appendChild(c); }
+      else if (it.manual) { const c = document.createElement('span'); c.className = 'mpe-chip man';
+        c.textContent = 'Adjusted'; pic.appendChild(c); }
+      if (data.clickable) { const o = document.createElement('div'); o.className = 'mpe-over';
+        o.textContent = data.hint || ''; pic.appendChild(o); }
+      const t = document.createElement('div'); t.className = 'mpe-t'; t.textContent = it.title; t.title = it.title;
+      const l = document.createElement('div');
+      l.className = 'mpe-l' + (it.warn ? ' warn' : it.manual ? ' man' : ''); l.textContent = it.label;
+      tile.append(pic, t, l);
+      grid.appendChild(tile);
+    }
+  }
+  grid.__data = data;
+  if (!grid.__bound) {
+    grid.__bound = true;
+    grid.addEventListener('click', e => {
+      const tile = e.target.closest('button.mpe-tile');
+      if (!tile || !grid.contains(tile)) return;
+      setTriggerValue('clicked', tile.dataset.id);
+      const target = grid.__data && grid.__data.scroll_to;
+      if (target) {
+        let tries = 0;
+        const go = () => {
+          const el = document.querySelector(target);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          else if (++tries < 15) setTimeout(go, 150);
+        };
+        setTimeout(go, 250);
+      }
+    });
+  }
+}
+"""
+
+_grid_component = st.components.v2.component("mpe_thumb_grid", html=GRID_HTML, css=GRID_CSS, js=GRID_JS)
+
+
+def thumb_tiles(key: str, items: list[dict], on_click=None, min_px: int = 140, aspect: str = "2 / 3",
+                hint: str = "Click to adjust", scroll_to: str | None = None):
+    """Grid of thumbnails. items: dict(id, src (data URL), title, label, warn, manual, seen (tooltip text or ""),
+    selected). When on_click is given, clicking a picture runs it; read the id with thumb_clicked(key)."""
+    return _grid_component(
+        key=key, width="stretch", on_clicked_change=on_click or (lambda: None),
+        data={"items": items, "min": min_px, "aspect": aspect, "clickable": on_click is not None,
+              "hint": hint, "scroll_to": scroll_to})
+
+
+def thumb_clicked(key: str):
+    state = st.session_state.get(key)
+    if state is None:
+        return None
+    return state.get("clicked") if hasattr(state, "get") else getattr(state, "clicked", None)

@@ -50,6 +50,7 @@ MODELS_DIR = STATE_DIR / "models"
 HISTORY_DB = STATE_DIR / "history.sqlite3"
 ADJ_FILE = STATE_DIR / "crop-adjustments.json"
 RECENT_FILE = STATE_DIR / "recent-folders.json"
+RECENT_OUT_FILE = STATE_DIR / "recent-destinations.json"
 
 # AI model downloads go to the app data folder, not ~/.cache (easy to find and remove)
 os.environ.setdefault("HF_HOME", str(MODELS_DIR / "huggingface"))

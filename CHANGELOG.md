@@ -4,6 +4,26 @@ All notable changes to Mosaic Photo-Editor. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-10-31
+
+### Added
+- Shape **None (whole photo)**: converts and resizes without cropping (set the longest side).
+- Batch: **Image Previews** filters (needs attention, no face found, adjusted, not adjusted, processed
+  before, new), search by file name, and sorting.
+- Click any thumbnail to open it in the crop editor (Upload and Batch).
+
+### Changed
+- The output format is now the first setting in the Output section (a dropdown, WebP by default).
+- Batch: **Convert** moved to the bottom of the Output section; it applies any changed settings first.
+- Batch: **Origin Folder** and **Destination Folder** are single dropdowns with up to 4 recent folders
+  and **Choose Folder...** at the end. Files that already exist are always skipped.
+- Upload: **Browse...** sits in the middle of the drop area; the start-up hint text is gone.
+- Thumbnail warnings are spelled out (for example "Too little space above the head") and no longer cut off.
+- Removed the example file name under the settings.
+
+### Fixed
+- Batch: **Done** now closes the crop editor.
+
 ## [1.0.1] - 2026-10-31
 
 ### Added

@@ -15,7 +15,7 @@ from PIL import Image
 from .. import ai, core, history
 from ..core import Output, Settings, Source
 from ..paths import ADJ_FILE, read_json, write_json
-from .components import crop_frame, crop_frame_value
+from .components import crop_frame, crop_frame_value, thumb_clicked, thumb_tiles
 
 PRIMARY = "#C8343E"       # Persian / candy-apple red
 DEEP = "#8E2430"          # headings
@@ -41,9 +41,10 @@ def session_id() -> str:
 
 def styles():
     from .. import native
-    # in the app window / on a Mac, the Browse button replaces the uploader's own button
-    hide_upload_button = ('.st-key-up_files [data-testid="stFileUploaderDropzone"] button { display: none; }'
-                          if native.can_pick() else "")
+    # in the app window / on a Mac, the Browse button takes the place of the uploader's own button
+    hide_upload_button = ('.st-key-up_files [data-testid="stFileUploaderDropzone"] > button,'
+                          '.st-key-up_files [data-testid="stFileUploaderDropzone"] > span > button'
+                          ' { visibility: hidden; }' if native.can_pick() else "")
     st.markdown(f"""
 <style>
   /* keep the page clear of the top navigation bar */
@@ -52,11 +53,24 @@ def styles():
   [data-testid="stSidebarLogo"], [data-testid="stHeaderLogo"] {{ height: 3.1rem; max-width: 15.5rem; }}
   [data-testid="stSidebarHeader"] {{ padding-top: 1rem; padding-bottom: 1rem; height: auto; }}
   /* big drop area for photos */
-  .st-key-up_files [data-testid="stFileUploaderDropzone"] {{ min-height: 11rem; justify-content: center;
-      border: 2px dashed #E9B7A3; background: #FFF7F2; }}
+  .st-key-up_files [data-testid="stFileUploaderDropzone"] {{ position: relative; height: 13rem;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .9rem;
+      border: 2px dashed #E9B7A3; background: #FFF7F2; text-align: center; }}
+  .st-key-up_files [data-testid="stFileUploaderDropzone"]::before {{ content: "Drop photos here";
+      font-weight: 600; font-size: 1.05rem; color: {DEEP}; }}
   .st-key-up_files [data-testid="stFileUploaderDropzone"]:hover {{ border-color: {PRIMARY}; background: #FFF1E9; }}
-  .st-key-up_files [data-testid="stFileUploaderDropzone"] > div {{ width: 100%; text-align: center; }}
+  .st-key-up_files [data-testid="stFileUploaderDropzone"] > div {{ order: 3; width: 100%; text-align: center;
+      justify-content: center; flex: none; height: auto; min-height: 0; padding: 0; margin: 0; }}
+  .st-key-up_files [data-testid="stFileUploaderDropzone"] > div * {{ text-align: center; justify-content: center; }}
+  .st-key-up_files [data-testid="stFileUploaderDropzone"] > button,
+  .st-key-up_files [data-testid="stFileUploaderDropzone"] > span {{ order: 2; }}
   {hide_upload_button}
+  /* the Browse button sits in the middle of the drop area, where the uploader's own button would be */
+  [data-testid="stLayoutWrapper"]:has(> .st-key-up-browse-slot), .st-key-up-browse-slot {{ height: 0;
+      overflow: visible; position: relative; z-index: 3; margin-bottom: -1rem; }}
+  .st-key-up-browse-slot {{ justify-content: center; }}
+  .st-key-up-browse-slot [data-testid="stButton"] {{ position: absolute; left: 50%; top: 5.375rem;
+      transform: translateX(-50%); width: auto; }}
   .mpe-hint {{ display: inline-flex; align-items: center; justify-content: center; width: 1.15rem; height: 1.15rem;
       border-radius: 50%; border: 1.5px solid #B9978C; color: #8E6A60; font-size: .72rem; font-weight: 700;
       cursor: help; user-select: none; }}
@@ -183,7 +197,8 @@ def save_adjustments():
 
 
 def adj_key(src_id: str, dims, ratio) -> str:
-    return f"{src_id}|{dims[0]}x{dims[1]}|{ratio[0]}:{ratio[1]}"
+    shape = f"{ratio[0]}:{ratio[1]}" if ratio else "whole"
+    return f"{src_id}|{dims[0]}x{dims[1]}|{shape}"
 
 
 NUDGE = 0.02      # move step, share of crop height
@@ -318,24 +333,58 @@ def hist_row(action: str, src: Source, fp: str, o: Output, s: Settings, path: st
 
 
 # --------------------------------------------------------------------------- lists and summary
-def thumb_grid(items: list[dict], ncols: int, adjust_state_key: str | None = None):
-    """Rows of equal-height thumbnails with fixed two-line captions so rows stay aligned.
-    items: dict(img, title, label, id, warn, manual, seen)."""
-    for r in range(0, len(items), ncols):
-        cols = st.columns(ncols)
-        for col, it in zip(cols, items[r:r + ncols]):
-            with col:
-                st.image(it["img"], width="stretch")
-                cls = "warn" if it.get("warn") else ("manual" if it.get("manual") else "")
-                seen = it.get("seen")
-                mark = (f'<span class="mpe-seen" style="width:1rem;height:1rem;font-size:.7rem;margin-right:.3rem" '
-                        f'title="{html.escape(history.describe(seen), quote=True)}">!</span>') if seen else ""
-                st.markdown(f'<div class="thumbcap"><div class="t" title="{html.escape(it["title"])}">{mark}'
-                            f'{html.escape(it["title"])}</div><div class="l {cls}">{html.escape(it["label"])}'
-                            f'</div></div>', unsafe_allow_html=True)
-                if adjust_state_key:
-                    st.button("Adjust", key=f"{adjust_state_key}-{it['id']}", type="tertiary",
-                              on_click=st.session_state.__setitem__, args=(adjust_state_key, it["id"]))
+WARN_TEXT = {"needs headroom": "Too little space above the head",
+             "check hair": "Check the hair at the top edge",
+             "AI error": "AI could not run"}
+
+
+def friendly_label(label: str) -> tuple[str, bool]:
+    """(text for a thumbnail, needs attention). Problems are spelled out in plain words."""
+    problems = [text for token, text in WARN_TEXT.items() if token in label]
+    if problems:
+        return "; ".join(problems), True
+    return label.replace("no face, top", "no face found"), False
+
+
+@st.cache_data(max_entries=800, show_spinner=False)
+def thumb_url(data: bytes, size: int = 360) -> str:
+    """Small JPEG of an image (output files can be large), as a data URL for the thumbnail grid."""
+    img = Image.open(io.BytesIO(data))
+    img.thumbnail((size, size), Image.LANCZOS)
+    if img.mode in ("RGBA", "LA", "P"):
+        img = img.convert("RGBA")
+        bg = Image.new("RGB", img.size, PEACH)
+        bg.paste(img, mask=img.split()[-1])
+        img = bg
+    return data_url(img, quality=82)
+
+
+def tile_aspect(s: Settings) -> str:
+    r = s.crop.ratio
+    return f"{r[0]} / {r[1]}" if r else "1 / 1"
+
+
+def thumb_grid(items: list[dict], key: str, s: Settings, adjust_state_key: str | None = None, min_px: int = 140,
+               scroll_to: str | None = None):
+    """Grid of thumbnails with a short caption; click a picture to adjust it (when adjust_state_key is
+    given). items: dict(img (bytes), title, label, id, warn, manual, seen)."""
+    sel = st.session_state.get(adjust_state_key) if adjust_state_key else None
+    tiles = []
+    for it in items:
+        text, warn = friendly_label(it["label"])
+        seen = it.get("seen")
+        tiles.append(dict(id=it["id"], src=thumb_url(it["img"]), title=it["title"],
+                          label="Adjusted by hand" if it.get("manual") and not warn else text,
+                          warn=bool(warn or it.get("warn")) and not it.get("manual"), manual=bool(it.get("manual")),
+                          seen=history.describe(seen) if seen else "", selected=it["id"] == sel))
+
+    def clicked():
+        v = thumb_clicked(key)
+        if v:
+            st.session_state[adjust_state_key] = v
+
+    thumb_tiles(key, tiles, clicked if adjust_state_key else None, min_px, tile_aspect(s),
+                hint="Click to adjust" if s.crop.ratio else "Click to preview", scroll_to=scroll_to)
 
 
 def metrics(n_sources: int, outputs: list[Output], src_bytes: int):
@@ -370,25 +419,10 @@ def resolve_duplicates(sources: list[Source], s: Settings, key: str):
     return [x for x in sources if not x.duplicate_of], rows
 
 
-def format_picker():
-    """Output format, shown on the page right under where photos come in. Applies immediately."""
-    labels = list(core.FORMAT_LABELS.values())
-    keys = {v: k for k, v in core.FORMAT_LABELS.items()}
-    cur = core.FORMAT_LABELS[st.session_state.get("fmt_value", "webp")]
-
-    def changed():
-        v = st.session_state.get("fmt_pick") or cur          # clicking the selected one keeps it
-        st.session_state["fmt_value"] = keys[v]
-
-    st.session_state["fmt_pick"] = cur
-    c1, c2 = st.columns([2, 3], vertical_alignment="center")
-    with c1:
-        st.segmented_control("Output format", labels, key="fmt_pick", on_change=changed, width="stretch")
-    fmt = st.session_state.get("fmt_value", "webp")
-    c2.caption({"webp": "WebP: smallest files, best for websites.",
-                "jpeg": "JPEG: for email, social media, print and older systems.",
-                "png": "PNG: lossless and much larger for photos. Best for graphics.",
-                "gif": "GIF: 256 colours only, photos will look grainy."}[fmt])
+FORMAT_HELP = {"webp": "WebP: smallest files, best for websites.",
+               "jpeg": "JPEG: for email, social media, print and older systems.",
+               "png": "PNG: lossless and much larger for photos. Best for graphics.",
+               "gif": "GIF: 256 colours only, photos will look grainy."}
 
 
 def release():

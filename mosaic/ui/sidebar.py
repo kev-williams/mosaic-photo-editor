@@ -12,9 +12,9 @@ import streamlit as st
 from PIL import Image
 
 from .. import ai, core, history, native, timing
-from ..core import CROP_PRESETS, CropPreset, Settings
+from ..core import CROP_PRESETS, NO_CROP, CropPreset, Settings
 from ..paths import INPUT_DIR, OUTPUT_DIR, count_files, empty_folder
-from .common import hint, np_mean_color, section, subhead
+from .common import FORMAT_HELP, hint, np_mean_color, section, subhead
 from .components import danger_button
 
 try:
@@ -207,22 +207,39 @@ def _empty_folders():
     st.session_state.pop("up_paths", None)
 
 
+def _format_changed():
+    st.session_state["fmt_value"] = st.session_state.get("fmt_pick") or "webp"
+    st.session_state["_fmt_changed"] = True
+    st.session_state.pop("zip_ready", None)
+
+
+def _convert():
+    st.session_state["_convert_now"] = True
+
+
 def _quit():
     st.session_state["_quitting"] = True
     native.quit_app()
 
 
 @st.fragment
-def settings_panel():
+def settings_panel(page: str = ""):
     if st.session_state.get("wb_pending"):
         wb_dialog()
     elif st.session_state.get("eyedrop_open"):
         eyedrop_dialog()
     fmt = st.session_state.get("fmt_value", "webp")
 
-    # ---- Output: file names, quality, size
-    with st.container(border=True):
+    # ---- Output: format, file names, quality (and Convert on the Batch page)
+    output_box = st.container(border=True)
+    with output_box:
         section("Output")
+        st.session_state["fmt_pick"] = fmt
+        st.selectbox("Format", list(core.FORMAT_LABELS), key="fmt_pick", format_func=core.FORMAT_LABELS.get,
+                     on_change=_format_changed)
+        st.caption(FORMAT_HELP[fmt])
+        if st.session_state.pop("_fmt_changed", False):
+            st.rerun(scope="app")                      # the format applies straight away
         subhead("File names")
         clean = st.toggle("Clean names", True, key="o_clean")
         preset_slug = st.session_state.get("o_shape_slug", "profile")
@@ -243,7 +260,11 @@ def settings_panel():
         section("Cropping")
         names = [p.name for p in CROP_PRESETS] + ["Custom"]
         pick = st.selectbox("Shape", names, key="o_shape")
-        if pick == "Custom":
+        no_crop = pick == NO_CROP.name
+        if no_crop:
+            longest = st.number_input("Longest side (px)", 16, 10000, NO_CROP.max_size[0], step=100, key="o_longest")
+            crop = CropPreset(NO_CROP.name, NO_CROP.slug, None, (int(longest), int(longest)), NO_CROP.cap_kb)
+        elif pick == "Custom":
             c1, c2 = st.columns(2)
             rw = c1.number_input("Ratio width", 1, 100, 4, key="o_rw")
             rh = c2.number_input("Ratio height", 1, 100, 5, key="o_rh")
@@ -255,12 +276,17 @@ def settings_panel():
             crop = CROP_PRESETS[names.index(pick)]
         st.session_state["o_shape_slug"] = crop.slug
         r, m = crop.ratio, crop.max_size
-        st.caption(f"Crops to {r[0]}:{r[1]}. Images larger than {m[0]}x{m[1]} are reduced to it; smaller "
-                   "images keep their resolution.")
-        anchors = {"Face detection": "face", "Top-weighted": "top", "Centre": "center"}
-        if not core.FACE_DETECTION_AVAILABLE:
-            anchors.pop("Face detection")
-        anchor = anchors[st.radio("Crop position", list(anchors), horizontal=True, key="o_anchor")]
+        if no_crop:
+            st.caption(f"No cropping: the whole photo is kept. Photos longer than {m[0]} px on either side are "
+                       "reduced; smaller photos keep their resolution.")
+            anchor = "center"
+        else:
+            st.caption(f"Crops to {r[0]}:{r[1]}. Images larger than {m[0]}x{m[1]} are reduced to it; smaller "
+                       "images keep their resolution.")
+            anchors = {"Face detection": "face", "Top-weighted": "top", "Centre": "center"}
+            if not core.FACE_DETECTION_AVAILABLE:
+                anchors.pop("Face detection")
+            anchor = anchors[st.radio("Crop position", list(anchors), horizontal=True, key="o_anchor")]
         subhead("File size cap")
         crop_cap = st.number_input("Size cap (KB)", 0, 20000, crop.cap_kb, step=10, key=f"cap-{crop.slug}",
                                    disabled=not lossy, label_visibility="collapsed")
@@ -274,7 +300,9 @@ def settings_panel():
     head_frac = 0.0
     with st.container(border=True):
         section("Head and face")
-        if anchor == "face":
+        if no_crop:
+            st.caption("Not used when Shape is None (no cropping).")
+        elif anchor == "face":
             if st.checkbox("Consistent head size", crop.slug == "profile", key=f"head-{crop.slug}"):
                 head_frac = st.slider("Face height (% of frame height)", 25, 55, int(core.HEAD_FRAC * 100),
                                       key="head-pct") / 100
@@ -293,7 +321,12 @@ def settings_panel():
             st.caption(":orange[Preparing the AI models in the background. The first AI result after "
                        "starting the app can take a little longer.]")
         portrait = crop.slug == "profile" and pick != "Custom"
-        white_bg, extend_top, bg_color, ai_extend, ext_top, ext_side, ext_bottom = background_controls(portrait)
+        if no_crop:
+            st.caption("Not used when Shape is None (no cropping).")
+            white_bg, extend_top, bg_color, ai_extend, ext_top, ext_side, ext_bottom = (
+                False, False, "#FFFFFF", False, 0.10, 0.0, 0.0)
+        else:
+            white_bg, extend_top, bg_color, ai_extend, ext_top, ext_side, ext_bottom = background_controls(portrait)
 
     if not lossy:              # PNG, GIF, lossless WebP: no quality to lower, so no cap
         crop_cap = 0
@@ -306,10 +339,15 @@ def settings_panel():
         st.session_state["applied"] = draft
     pending = draft != st.session_state["applied"]
 
-    base = core.base_name("Jane DOE_01.JPG", draft)
-    st.caption("Example file name: `" + core.output_name(base, draft, crop.slug,
-                                                       core.planned_size((4000, 6000), draft))
-               .replace(".webp", core.FORMATS[fmt][1]) + "`")
+    if page == "batch":                                # Convert sits at the bottom of the Output box
+        with output_box:
+            st.button("Convert", type="primary", width="stretch", key="convert-btn", on_click=_convert,
+                      help="Convert the photos in the Origin Folder (applies any changed settings first).")
+    if st.session_state.pop("_convert_now", False):
+        st.session_state["applied"] = draft
+        st.session_state["batch_go"] = True
+        st.session_state.pop("zip_ready", None)
+        st.rerun(scope="app")
 
     with st.container(key="apply-bar"):
         st.button("Apply changes" if pending else "Settings applied", type="primary", width="stretch",

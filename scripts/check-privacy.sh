@@ -9,7 +9,7 @@ set -eu
 
 ALLOWED='^(assets/icon\.svg|assets/logo\.svg|assets/AppIcon\.icns|mosaic/models/face_detection_yunet_2023mar\.onnx)$'
 BLOCKED='\.(jpe?g|jfif|png|gif|webp|avif|heic|heif|tiff?|bmp|ico|icns|svg|psd|psb|ai|eps|indd|xcf|kra|raw|dng|cr2|cr3|nef|nrw|arw|srf|sr2|orf|raf|rw2|pef|srw|x3f|3fr|erf|mef|mos|iiq|mp4|mov|m4v|avi|mkv|webm|mp3|wav|m4a|aac|flac|pdf|zip|7z|rar|tar|gz|tgz|dmg|pkg|sqlite3?|db|onnx|pt|pth|ckpt|safetensors|bin|h5|npz|npy|pkl|pickle|csv|xlsx?|numbers|key|pem|p12|pfx|crt|cer|keychain)$'
-SECRETS='(^|/)(\.env(\..*)?|id_rsa.*|id_ed25519.*|credentials.*|secrets?\..*|crop-adjustments\.json|recent-folders\.json)$'
+SECRETS='(^|/)(\.env(\..*)?|id_rsa.*|id_ed25519.*|credentials.*|secrets?\..*|crop-adjustments\.json|recent-folders\.json|recent-destinations\.json)$'
 MAX_BYTES=5242880
 
 if [ "${1:-}" = "--all" ]; then

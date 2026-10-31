@@ -52,6 +52,20 @@ def test_make_crop_profile_size_and_name(photo):
     assert Image.open(io.BytesIO(o.data)).format == "WEBP"
 
 
+def test_no_crop_keeps_whole_photo_and_reduces(photo):
+    s = core.Settings(crop=replace(core.NO_CROP, max_size=(500, 500)))
+    full = core.probe(photo)
+    assert core.auto_box(full, None, "face") == (0, 0, *full)
+    assert core.fit_ratio((10, 10, 50, 50), None, full) == (0, 0, *full)
+    assert core.pads(full, s) == (0, 0, 0)
+    o = core.make_crop(photo, "Jane DOE_01.JPG", s, core.base_name("Jane DOE_01.JPG", s))
+    assert o.status == "ok", o.note
+    assert o.filename == "jane-doe-01-full.webp"
+    assert max(o.out_size) == 500
+    assert abs(o.out_size[0] / o.out_size[1] - full[0] / full[1]) < 0.01
+    assert o.crop == "whole photo"
+
+
 @pytest.mark.parametrize("fmt,pil", [("jpeg", "JPEG"), ("png", "PNG"), ("gif", "GIF")])
 def test_formats(photo, fmt, pil):
     s = replace(core.Settings(), fmt=fmt)

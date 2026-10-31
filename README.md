@@ -60,10 +60,9 @@ flowchart LR
     D --> E["Save WebP / JPEG /<br>PNG / GIF"]
 ```
 
-**Upload** is for quick jobs. Drop photos on the drop area, or use **Browse...** to pick photos or whole
-folders anywhere on your Mac.
-Pick the output format right under the photos. Each photo gets a crop editor and a large preview,
-side by side and the same height.
+**Upload** is for quick jobs. Drop photos on the drop area, or use **Browse...** in its middle to pick
+photos or whole folders anywhere on your Mac. Each photo gets a crop editor and a large preview, side by
+side and the same height. Click any thumbnail under **All crops** to open it in the editor.
 
 - Drag the frame to move it, drag a corner to resize it, or use the arrow keys (Shift for bigger steps).
   The dashed line shows where the eyes should sit.
@@ -73,15 +72,20 @@ side by side and the same height.
 - **Download**, or **Save to Output folder**. A **!** next to Download means the photo was already
   processed with the same format and size in the last 7 days; hover it to see when.
 
-**Batch** converts whole folders. Choose a folder, review every crop in a grid (filter by *Needs
-attention*, *No face found*, *Adjusted* or *Processed before*), adjust any of them, then **Convert**.
-Converted files go to `Output/<folder name>/<shape>/`. A CSV report is optional.
+**Batch** converts whole folders. Pick the **Origin Folder** and **Destination Folder** (each lists your
+recent folders, with **Choose Folder...** at the end). Check the crops under **Image Previews**: filter
+by *Needs attention*, *No face found*, *Adjusted*, *Processed before* and more, search by name, sort,
+and click a photo to adjust it. Then press **Convert** at the bottom of the Output section on the left.
+Files go to `Output/<folder name>/<shape>/` by default; files that already exist are skipped. A CSV
+report is optional.
 
 ### The settings panel
 
-Settings are grouped from top to bottom: **Output** (file names, quality), **Cropping** (shape, crop
-position, file-size cap), **Head and face** and **Image background** (AI). Change as many as you like,
-then press **Apply changes**: photos are only reprocessed once, so there is no waiting between clicks.
+Settings are grouped from top to bottom: **Output** (format, file names, quality, and **Convert** on the
+Batch page), **Cropping** (shape, crop position, file-size cap), **Head and face** and **Image background**
+(AI). Shape **None (whole photo)** skips cropping and only resizes. The format applies straight away; for
+everything else, change as many as you like, then press **Apply changes**: photos are only reprocessed
+once, so there is no waiting between clicks.
 
 At the bottom: **Clear cached images** frees memory, **Hold to empty Input and Output** moves everything
 in those two folders to the Trash (hold the button to confirm), and **History** shows or clears the record

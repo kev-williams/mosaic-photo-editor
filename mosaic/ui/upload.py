@@ -12,9 +12,9 @@ import streamlit as st
 from .. import core, history, native
 from ..core import EYE_Y, Source
 from ..paths import INPUT_DIR, OUTPUT_DIR
-from .common import (adj_key, progress_note, adjustments, before_image, cached_crop, crop_editor, current_settings,
-                     fill_pads, fingerprint, format_picker, has_effect, hist_row, human, metrics,
-                     preview_html, release, resolve_duplicates, seen_badge, thumb_grid)
+from .common import (EDIT_MAX, adj_key, adjustments, before_image, cached_crop, crop_editor, current_settings,
+                     fill_pads, fingerprint, has_effect, hist_row, human, metrics, preview_html, progress_note,
+                     release, resolve_duplicates, seen_badge, thumb_grid)
 
 IMAGE_TYPES = sorted(e[1:] for e in core.INPUT_EXTS)
 
@@ -104,9 +104,16 @@ def editor_area(sel: str, item, base: str, seen_row):
     pad = fill_pads(o.src_size, s)
     left, right = st.columns(2, gap="large")
     with left:
-        guide = EYE_Y if (s.crop.slug == "profile" and s.anchor == "face") else None
-        height = crop_editor(key, sel, mkey, src, o.src_size, auto, s.crop.ratio, pad,
-                             s.bg_color if s.white_bg else None, guide)
+        if s.crop.ratio:
+            guide = EYE_Y if (s.crop.slug == "profile" and s.anchor == "face") else None
+            height = crop_editor(key, sel, mkey, src, o.src_size, auto, s.crop.ratio, pad,
+                                 s.bg_color if s.white_bg else None, guide)
+        else:                                           # no cropping: show the original, nothing to adjust
+            w, h = o.src_size
+            height = int(min(EDIT_MAX[1], EDIT_MAX[0] * h / w))
+            st.markdown(preview_html(before_image(sel, mkey, src, s, tuple(o.crop_box)), "image/jpeg", height),
+                        unsafe_allow_html=True)
+            st.caption("Original. Cropping is off (Shape: None), so the whole photo is kept.")
     with right:
         view = st.session_state.get(f"cmp-{sel}") or "After" if has_effect(s) else "After"
         if view == "Before":
@@ -139,25 +146,23 @@ def editor_area(sel: str, item, base: str, seen_row):
 def upload_page():
     s = current_settings()
     native_pick = native.can_pick()
-    st.file_uploader("Drop photos here" if native_pick else "Drop photos here, or click to browse",
-                     type=IMAGE_TYPES, accept_multiple_files=True, key="up_files")
-    with st.container(horizontal=True, vertical_alignment="center", gap="small"):
-        if native_pick:
+    if native_pick:
+        with st.container(key="up-browse-slot", horizontal=True):
             st.button("Browse...", type="primary", on_click=_browse, key="up-browse")
-        if st.session_state.get("up_paths"):
-            n = len(st.session_state["up_paths"])
-            st.button(f"Clear {n} browsed photo{'s' if n != 1 else ''}", type="tertiary", on_click=_clear_paths,
-                      key="up-clear")
-        msg = st.session_state.pop("up_msg", None)
-        if msg:
-            st.caption(msg)
-    format_picker()
+    st.file_uploader("Drop photos here", type=IMAGE_TYPES, accept_multiple_files=True, key="up_files",
+                     label_visibility="collapsed")
+    if st.session_state.get("up_paths") or st.session_state.get("up_msg"):
+        with st.container(horizontal=True, vertical_alignment="center", gap="small"):
+            msg = st.session_state.pop("up_msg", None)
+            if msg:
+                st.caption(msg)
+            if st.session_state.get("up_paths"):
+                n = len(st.session_state["up_paths"])
+                st.button(f"Clear {n} browsed photo{'s' if n != 1 else ''}", type="tertiary",
+                          on_click=_clear_paths, key="up-clear")
 
     items = collect()
     if not items:
-        st.info("Add photos to start: drop them above"
-                + (", or use Browse to choose photos or whole folders anywhere on this Mac." if native_pick else ".")
-                + " For big batches of full-resolution photos, use Batch.")
         return
     if len(items) > 40:
         st.caption("Tip: for batches this size, Batch is faster and writes straight to a folder.")
@@ -186,7 +191,7 @@ def upload_page():
     fps = {x.id: fingerprint(x.id, items[x.id][2], items[x.id][1]) for x in keep}
     seen = history.recent([f for f in fps.values() if f], s.spec, st.session_state.get("_sid"))
 
-    st.subheader("Preview and adjust")
+    st.subheader("Preview and adjust", anchor="preview-and-adjust")
     names = {x.id: x.filename for x in keep}
     if st.session_state.get("up-sel") not in names:
         st.session_state.pop("up-sel", None)
@@ -194,14 +199,15 @@ def upload_page():
     editor_area(sel, items[sel], next(x.base for x in keep if x.id == sel), seen.get(fps[sel]))
 
     st.divider()
-    st.subheader("All crops")
-    st.caption("Click Adjust under a photo to edit it above. An exclamation mark means the photo was already "
-               f"processed with this format and size in the last {history.RECENT_DAYS} days.")
+    st.subheader("All crops" if s.crop.ratio else "All photos")
+    st.caption(("Click a photo to open it above. " if s.crop.ratio else "")
+               + "An exclamation mark means the photo was already processed with this format and size in the "
+               f"last {history.RECENT_DAYS} days.")
     grid = [dict(img=o.data, title=o.filename, id=x.id, manual=o.crop == "manual",
                  warn="headroom" in o.crop or "check hair" in o.crop, seen=seen.get(fps[x.id]),
                  label=f"{o.out_size[0]}x{o.out_size[1]} · {human(o.bytes_out)} · {o.crop}")
             for x in keep if (o := by_src[x.id]).data]
-    thumb_grid(grid, 6, adjust_state_key="up-sel")
+    thumb_grid(grid, "up-grid", s, adjust_state_key="up-sel", min_px=150, scroll_to="#preview-and-adjust")
     for o in outputs:
         if o.status in ("error", "over cap"):
             (st.error if o.status == "error" else st.warning)(f"{o.source}: {o.note}")
