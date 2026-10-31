@@ -1,0 +1,8 @@
+# Mosaic Photo-Editor - AI features (background replacement, AI extender). About 1 GB with models.
+torch>=2.5
+torchvision
+transformers>=4.44,<5
+timm
+kornia
+einops
+requests

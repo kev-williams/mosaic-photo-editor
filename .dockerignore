@@ -1,0 +1,9 @@
+# Only the app goes into the image (allowlist)
+*
+!app.py
+!requirements.txt
+!mosaic/**
+!assets/**
+!.streamlit/**
+**/__pycache__
+**/*.pyc

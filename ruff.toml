@@ -1,0 +1,9 @@
+line-length = 120
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "W"]
+ignore = ["E731", "E741"]
+
+[lint.per-file-ignores]
+"mosaic/ui/components.py" = ["E501"]   # embedded HTML/CSS/JS

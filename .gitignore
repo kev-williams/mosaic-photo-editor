@@ -1,0 +1,89 @@
+# ----------------------------------------------------------------------------------------------
+# ALLOWLIST. Everything is ignored unless it is listed below.
+# Photos, exports, models, settings and anything new can never be committed by accident.
+# Adding a source file? List it here on purpose. (See CONTRIBUTING.md.)
+# ----------------------------------------------------------------------------------------------
+*
+!*/
+
+# Project files
+!/.gitignore
+!/.gitattributes
+!/.dockerignore
+!/README.md
+!/LICENSE
+!/THIRD_PARTY_NOTICES.md
+!/CHANGELOG.md
+!/CONTRIBUTING.md
+!/CODE_OF_CONDUCT.md
+!/SECURITY.md
+!/ruff.toml
+!/requirements.txt
+!/requirements-ai.txt
+!/requirements-dev.txt
+
+# App
+!/app.py
+!/launcher.py
+!/mosaic/*.py
+!/mosaic/ui/*.py
+!/.streamlit/config.toml
+
+# Scripts, Docker, tests, GitHub
+!/scripts/*.sh
+!/.githooks/pre-commit
+!/docker/Dockerfile
+!/docker/docker-compose.yml
+!/docker/env.example
+!/tests/*.py
+!/.github/workflows/*.yml
+!/.github/ISSUE_TEMPLATE/*.md
+!/.github/ISSUE_TEMPLATE/config.yml
+!/.github/PULL_REQUEST_TEMPLATE.md
+
+# ----------------------------------------------------------------------------------------------
+# NEVER, even if a rule above would include them: media, photos, raw files, data, secrets.
+# ----------------------------------------------------------------------------------------------
+*.[jJ][pP][gG]
+*.[jJ][pP][eE][gG]
+*.[pP][nN][gG]
+*.[gG][iI][fF]
+*.[wW][eE][bB][pP]
+*.[aA][vV][iI][fF]
+*.[hH][eE][iI][cC]
+*.[hH][eE][iI][fF]
+*.[tT][iI][fF]
+*.[tT][iI][fF][fF]
+*.[bB][mM][pP]
+*.[sS][vV][gG]
+*.[iI][cC][nN][sS]
+*.[pP][sS][dD]
+*.[dD][nN][gG]
+*.[cC][rR][23]
+*.[nN][eE][fF]
+*.[aA][rR][wW]
+*.[rR][aA][fF]
+*.[oO][rR][fF]
+*.[rR][wW]2
+*.[mM][pP]4
+*.[mM][oO][vV]
+*.[pP][dD][fF]
+*.[zZ][iI][pP]
+*.[cC][sS][vV]
+*.sqlite*
+*.db
+*.onnx
+*.pt
+*.pth
+*.safetensors
+.env
+.env.*
+**/__pycache__/
+*.pyc
+.DS_Store
+
+# The app's own artwork and the face detection model (the only binary files in the repository)
+!/assets/icon.svg
+!/assets/logo.svg
+!/assets/AppIcon.icns
+!/mosaic/models/face_detection_yunet_2023mar.onnx

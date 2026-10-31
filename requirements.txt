@@ -1,0 +1,9 @@
+# Mosaic Photo-Editor - core packages (installed by scripts/install.sh)
+streamlit>=1.66,<2
+pillow>=11.0
+pillow-heif>=0.18
+numpy>=1.26
+opencv-python-headless>=4.9,<5
+streamlit-image-coordinates>=0.4
+send2trash>=1.8
+pywebview>=6.2; sys_platform == "darwin"

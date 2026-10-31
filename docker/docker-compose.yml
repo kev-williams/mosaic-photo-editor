@@ -1,0 +1,32 @@
+# Mosaic Photo-Editor in Docker (backup option). From the repository root:
+#   cp docker/env.example docker/.env      (then edit it)
+#   docker compose -f docker/docker-compose.yml up -d --build
+# Open http://localhost:8501. Stop with: docker compose -f docker/docker-compose.yml down
+services:
+  mosaic:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: mosaic-photo-editor
+    init: true
+    ports:
+      - "127.0.0.1:8501:8501"          # this computer only
+    volumes:
+      # Input / Output folders (default: ~/Pictures/Mosaic Photo-Editor)
+      - ${MOSAIC_PHOTOS:-~/Pictures/Mosaic Photo-Editor}:/data
+      # App data: history and crop adjustments
+      - mosaic-state:/state
+      # Optional: a folder the app may read originals from in place (read-only), at the same path
+      - ${INPUT_ROOT:-/tmp}:${INPUT_ROOT:-/input-root}:ro
+    environment:
+      - INPUT_ROOT=${INPUT_ROOT:-}
+      - WORKERS=4
+      - FULL_SIZE_WORKERS=2
+    mem_limit: 3g
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "2" }
+    restart: unless-stopped
+
+volumes:
+  mosaic-state:

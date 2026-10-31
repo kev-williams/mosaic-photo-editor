@@ -1,0 +1,41 @@
+[server]
+maxUploadSize = 500
+headless = true
+address = "127.0.0.1"        # this computer only; the Docker image overrides it
+fileWatcherType = "none"     # the code doesn't change while the app runs
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"      # no Deploy menu
+
+[runner]
+magicEnabled = false
+
+# Warm palette from the Mosaic mesh artwork: Persian / candy-apple red, sienna and apricot
+# orange, peach.
+[theme]
+base = "light"
+primaryColor = "#C8343E"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#FFF1E9"
+textColor = "#2B1A17"
+linkColor = "#B5462A"
+borderColor = "#F2D4C4"
+redColor = "#A61B1B"
+orangeColor = "#C8582A"
+blueColor = "#B5462A"             # info boxes in warm sienna instead of blue
+blueBackgroundColor = "#FFF1E9"
+blueTextColor = "#8E3A1E"
+font = "sans serif"
+baseRadius = "0.6rem"
+buttonRadius = "0.6rem"
+showWidgetBorder = true
+metricValueFontSize = "1.7rem"
+metricValueFontWeight = 650
+
+[theme.sidebar]
+backgroundColor = "#FFF5EF"
+secondaryBackgroundColor = "#FFFFFF"
+borderColor = "#F2D4C4"

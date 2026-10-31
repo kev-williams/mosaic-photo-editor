@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stops commits that include photos, private data or large files. Installed by scripts/install.sh
+# (git config core.hooksPath .githooks). Do not bypass it with --no-verify.
+exec "$(git rev-parse --show-toplevel)/scripts/check-privacy.sh"
